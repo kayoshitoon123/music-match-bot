@@ -11,6 +11,5 @@ class Form(StatesGroup):
     looking = State()
 
     photo = State()
-    beat = State()
 
     description = State()
