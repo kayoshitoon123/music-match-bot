@@ -1,4 +1,5 @@
 import aiosqlite
+import time
 
 DB="music_match.db"
 
@@ -35,6 +36,19 @@ async def init_db():
 
         user_from INTEGER,
         user_to INTEGER
+
+        )
+
+        """)
+
+        await db.execute("""
+
+        CREATE TABLE IF NOT EXISTS actions(
+
+        user_from INTEGER,
+        user_to INTEGER,
+        action TEXT,
+        time INTEGER
 
         )
 
@@ -79,9 +93,23 @@ async def delete_user(user_id):
         await db.commit()
 
 
+async def add_action(user_from,user_to,action):
+
+    async with aiosqlite.connect(DB) as db:
+
+        await db.execute(
+        "INSERT INTO actions VALUES(?,?,?,?)",
+        (user_from,user_to,action,int(time.time()))
+        )
+
+        await db.commit()
+
+
 async def get_candidates(user):
 
     async with aiosqlite.connect(DB) as db:
+
+        day_ago = int(time.time()) - 86400
 
         if user[5]=="🎵 Все равно":
 
@@ -92,8 +120,12 @@ async def get_candidates(user):
             WHERE city=?
             AND age BETWEEN ? AND ?
             AND telegram_id != ?
+            AND telegram_id NOT IN (
+                SELECT user_to FROM actions
+                WHERE user_from=? AND time>?
+            )
 
-            """,(user[3],user[2]-4,user[2]+4,user[0]))
+            """,(user[3],user[2]-4,user[2]+4,user[0],user[0],day_ago))
 
         else:
 
@@ -105,8 +137,12 @@ async def get_candidates(user):
             AND age BETWEEN ? AND ?
             AND role=?
             AND telegram_id != ?
+            AND telegram_id NOT IN (
+                SELECT user_to FROM actions
+                WHERE user_from=? AND time>?
+            )
 
-            """,(user[3],user[2]-4,user[2]+4,user[5],user[0]))
+            """,(user[3],user[2]-4,user[2]+4,user[5],user[0],user[0],day_ago))
 
         return await cursor.fetchall()
 
@@ -115,12 +151,19 @@ async def get_any(user):
 
     async with aiosqlite.connect(DB) as db:
 
-        cursor=await db.execute(
+        day_ago = int(time.time()) - 86400
 
-        "SELECT * FROM users WHERE telegram_id != ?",
-        (user[0],)
+        cursor=await db.execute("""
 
+        SELECT * FROM users
+
+        WHERE telegram_id != ?
+        AND telegram_id NOT IN (
+            SELECT user_to FROM actions
+            WHERE user_from=? AND time>?
         )
+
+        """,(user[0],user[0],day_ago))
 
         return await cursor.fetchall()
 
