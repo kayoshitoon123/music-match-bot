@@ -40,6 +40,17 @@ async def init_db():
 
         """)
 
+        await db.execute("""
+
+        CREATE TABLE IF NOT EXISTS skips(
+
+        user_from INTEGER,
+        user_to INTEGER
+
+        )
+
+        """)
+
         await db.commit()
 
 
@@ -83,30 +94,19 @@ async def get_candidates(user):
 
     async with aiosqlite.connect(DB) as db:
 
-        if user[5]=="🎵 Все равно":
+        cursor=await db.execute("""
 
-            cursor=await db.execute("""
+        SELECT * FROM users
 
-            SELECT * FROM users
+        WHERE city=?
+        AND telegram_id != ?
+        AND telegram_id NOT IN (
+            SELECT user_to FROM likes WHERE user_from=?
+            UNION
+            SELECT user_to FROM skips WHERE user_from=?
+        )
 
-            WHERE city=?
-            AND age BETWEEN ? AND ?
-            AND telegram_id != ?
-
-            """,(user[3],user[2]-4,user[2]+4,user[0]))
-
-        else:
-
-            cursor=await db.execute("""
-
-            SELECT * FROM users
-
-            WHERE city=?
-            AND age BETWEEN ? AND ?
-            AND role=?
-            AND telegram_id != ?
-
-            """,(user[3],user[2]-4,user[2]+4,user[5],user[0]))
+        """,(user[3],user[0],user[0],user[0]))
 
         return await cursor.fetchall()
 
@@ -115,12 +115,18 @@ async def get_any(user):
 
     async with aiosqlite.connect(DB) as db:
 
-        cursor=await db.execute(
+        cursor=await db.execute("""
 
-        "SELECT * FROM users WHERE telegram_id != ?",
-        (user[0],)
+        SELECT * FROM users
 
+        WHERE telegram_id != ?
+        AND telegram_id NOT IN (
+            SELECT user_to FROM likes WHERE user_from=?
+            UNION
+            SELECT user_to FROM skips WHERE user_from=?
         )
+
+        """,(user[0],user[0],user[0]))
 
         return await cursor.fetchall()
 
@@ -131,6 +137,18 @@ async def add_like(a,b):
 
         await db.execute(
         "INSERT INTO likes VALUES(?,?)",
+        (a,b)
+        )
+
+        await db.commit()
+
+
+async def add_skip(a,b):
+
+    async with aiosqlite.connect(DB) as db:
+
+        await db.execute(
+        "INSERT INTO skips VALUES(?,?)",
         (a,b)
         )
 
