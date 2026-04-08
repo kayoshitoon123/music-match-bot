@@ -1,7 +1,7 @@
 import aiosqlite
 import time
 
-DB="music_match.db"
+DB = "music_match.db"
 
 
 async def init_db():
@@ -22,7 +22,6 @@ async def init_db():
         looking TEXT,
 
         photo TEXT,
-
         description TEXT
 
         )
@@ -34,9 +33,7 @@ async def init_db():
         CREATE TABLE IF NOT EXISTS likes(
 
         user_from INTEGER,
-        user_to INTEGER,
-
-        UNIQUE(user_from,user_to)
+        user_to INTEGER
 
         )
 
@@ -44,11 +41,10 @@ async def init_db():
 
         await db.execute("""
 
-        CREATE TABLE IF NOT EXISTS actions(
+        CREATE TABLE IF NOT EXISTS views(
 
         user_from INTEGER,
         user_to INTEGER,
-        action TEXT,
         time INTEGER
 
         )
@@ -74,7 +70,7 @@ async def get_user(user_id):
 
     async with aiosqlite.connect(DB) as db:
 
-        cursor=await db.execute(
+        cursor = await db.execute(
         "SELECT * FROM users WHERE telegram_id=?",
         (user_id,)
         )
@@ -94,13 +90,13 @@ async def delete_user(user_id):
         await db.commit()
 
 
-async def add_action(user_from,user_to,action):
+async def add_view(a, b):
 
     async with aiosqlite.connect(DB) as db:
 
         await db.execute(
-        "INSERT INTO actions VALUES(?,?,?,?)",
-        (user_from,user_to,action,int(time.time()))
+        "INSERT INTO views VALUES(?,?,?)",
+        (a, b, int(time.time()))
         )
 
         await db.commit()
@@ -110,27 +106,25 @@ async def get_candidates(user):
 
     async with aiosqlite.connect(DB) as db:
 
-        day_ago = int(time.time()) - 86400
+        limit_time = int(time.time()) - 86400
 
-        if user[5]=="🎵 Все равно":
+        if user[5] == "🎵 Все равно":
 
-            cursor=await db.execute("""
+            cursor = await db.execute("""
 
             SELECT * FROM users
 
             WHERE city=?
             AND age BETWEEN ? AND ?
             AND telegram_id != ?
-            AND telegram_id NOT IN (
-                SELECT user_to FROM actions
-                WHERE user_from=? AND time>?
-            )
+            AND telegram_id NOT IN
+            (SELECT user_to FROM views WHERE user_from=? AND time>?)
 
-            """,(user[3],user[2]-4,user[2]+4,user[0],user[0],day_ago))
+            """, (user[3], user[2]-4, user[2]+4, user[0], user[0], limit_time))
 
         else:
 
-            cursor=await db.execute("""
+            cursor = await db.execute("""
 
             SELECT * FROM users
 
@@ -138,12 +132,10 @@ async def get_candidates(user):
             AND age BETWEEN ? AND ?
             AND role=?
             AND telegram_id != ?
-            AND telegram_id NOT IN (
-                SELECT user_to FROM actions
-                WHERE user_from=? AND time>?
-            )
+            AND telegram_id NOT IN
+            (SELECT user_to FROM views WHERE user_from=? AND time>?)
 
-            """,(user[3],user[2]-4,user[2]+4,user[5],user[0],user[0],day_ago))
+            """, (user[3], user[2]-4, user[2]+4, user[5], user[0], user[0], limit_time))
 
         return await cursor.fetchall()
 
@@ -152,44 +144,42 @@ async def get_any(user):
 
     async with aiosqlite.connect(DB) as db:
 
-        day_ago = int(time.time()) - 86400
+        limit_time = int(time.time()) - 86400
 
-        cursor=await db.execute("""
+        cursor = await db.execute("""
 
         SELECT * FROM users
 
         WHERE telegram_id != ?
-        AND telegram_id NOT IN (
-            SELECT user_to FROM actions
-            WHERE user_from=? AND time>?
-        )
+        AND telegram_id NOT IN
+        (SELECT user_to FROM views WHERE user_from=? AND time>?)
 
-        """,(user[0],user[0],day_ago))
+        """, (user[0], user[0], limit_time))
 
         return await cursor.fetchall()
 
 
-async def add_like(a,b):
+async def add_like(a, b):
 
     async with aiosqlite.connect(DB) as db:
 
         await db.execute(
-        "INSERT OR IGNORE INTO likes VALUES(?,?)",
-        (a,b)
+        "INSERT INTO likes VALUES(?,?)",
+        (a, b)
         )
 
         await db.commit()
 
 
-async def check_match(a,b):
+async def check_match(a, b):
 
     async with aiosqlite.connect(DB) as db:
 
-        cursor=await db.execute("""
+        cursor = await db.execute("""
 
-        SELECT 1 FROM likes
+        SELECT * FROM likes
         WHERE user_from=? AND user_to=?
 
-        """,(b,a))
+        """, (b, a))
 
         return await cursor.fetchone()
