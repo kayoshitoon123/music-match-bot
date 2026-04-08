@@ -9,7 +9,6 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardBut
 import database as db
 import keyboards as kb
 from states import Form
-from cities import nearby_cities
 from config import TOKEN
 
 
@@ -52,7 +51,7 @@ async def show_next_profile(user_id):
 
 {target[4]}
 
-{target[8]}
+{target[7]}
 
 """
 
@@ -166,25 +165,6 @@ async def photo(message: types.Message, state: FSMContext):
         await state.update_data(photo=photo)
 
     await message.answer(
-        "Отправь бит или пропусти",
-        reply_markup=kb.skip_kb
-    )
-
-    await state.set_state(Form.beat)
-
-
-@dp.message(Form.beat)
-async def beat(message: types.Message, state: FSMContext):
-
-    if message.text == "Пропустить":
-
-        await state.update_data(beat=None)
-
-    else:
-
-        await state.update_data(beat=message.audio.file_id)
-
-    await message.answer(
         "Напиши описание или пропусти",
         reply_markup=kb.skip_kb
     )
@@ -217,7 +197,6 @@ async def desc(message: types.Message, state: FSMContext):
         data["looking"],
 
         data["photo"],
-        data["beat"],
 
         description
 
@@ -229,16 +208,6 @@ async def desc(message: types.Message, state: FSMContext):
     )
 
     await state.clear()
-
-
-@dp.message(F.text == "✏️ Изменить анкету")
-async def edit(message: types.Message, state: FSMContext):
-
-    await db.delete_user(message.from_user.id)
-
-    await message.answer("Введи имя")
-
-    await state.set_state(Form.name)
 
 
 @dp.message(F.text == "🔎 Начать поиск")
@@ -256,34 +225,6 @@ async def like_profile(callback: CallbackQuery):
     await db.add_like(sender, target_id)
     await db.add_action(sender, target_id, "like")
 
-    sender_profile = await db.get_user(sender)
-
-    text = f"""
-{sender_profile[1]}, {sender_profile[2]}
-{sender_profile[3]}
-
-{sender_profile[4]}
-
-{sender_profile[8]}
-"""
-
-    if sender_profile[6]:
-
-        await bot.send_photo(
-            target_id,
-            sender_profile[6],
-            caption="🔥 Ваша анкета понравилась!\n\n" + text,
-            reply_markup=match_kb(sender)
-        )
-
-    else:
-
-        await bot.send_message(
-            target_id,
-            "🔥 Ваша анкета понравилась!\n\n" + text,
-            reply_markup=match_kb(sender)
-        )
-
     await callback.answer("❤️ Лайк отправлен")
 
     await show_next_profile(sender)
@@ -300,34 +241,6 @@ async def skip_profile(callback: CallbackQuery):
     await callback.answer("Анкета пропущена")
 
     await show_next_profile(user_id)
-
-
-@dp.callback_query(F.data.startswith("match_like_"))
-async def match_like(callback: CallbackQuery):
-
-    receiver = callback.from_user.id
-    sender = int(callback.data.split("_")[2])
-
-    await db.add_like(receiver, sender)
-
-    if await db.check_match(receiver, sender):
-
-        user1 = await bot.get_chat(receiver)
-        user2 = await bot.get_chat(sender)
-
-        link1 = f"https://t.me/{user1.username}"
-        link2 = f"https://t.me/{user2.username}"
-
-        await bot.send_message(sender, f"🎉 У вас взаимный лайк!\n{link1}")
-        await bot.send_message(receiver, f"🎉 У вас взаимный лайк!\n{link2}")
-
-    await callback.answer("❤️ Лайк отправлен")
-
-
-@dp.callback_query(F.data == "match_skip")
-async def match_skip(callback: CallbackQuery):
-
-    await callback.answer("Анкета отклонена 👎")
 
 
 async def main():
