@@ -13,17 +13,28 @@ from config import TOKEN
 
 
 bot = Bot(token=TOKEN)
-
 dp = Dispatcher(storage=MemoryStorage())
 
 
 def like_notify_kb(user_id):
-
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="❤️ Лайк", callback_data=f"match_like_{user_id}"),
                 InlineKeyboardButton(text="👎 Скип", callback_data="match_skip")
+            ]
+        ]
+    )
+
+
+def chat_button(user_id):
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="💬 Написать",
+                    url=f"tg://user?id={user_id}"
+                )
             ]
         ]
     )
@@ -221,20 +232,16 @@ async def like_profile(callback: CallbackQuery):
 
     if match:
 
-        sender_profile = await db.get_user(sender)
-        target_profile = await db.get_user(target)
-
-        link1 = f"tg://user?id={sender}"
-        link2 = f"tg://user?id={target}"
-
         await bot.send_message(
             sender,
-            f"❤️ Взаимный лайк!\n\nНапиши: {link2}"
+            "❤️ Взаимный лайк!",
+            reply_markup=chat_button(target)
         )
 
         await bot.send_message(
             target,
-            f"❤️ Взаимный лайк!\n\nНапиши: {link1}"
+            "❤️ Взаимный лайк!",
+            reply_markup=chat_button(sender)
         )
 
     else:
@@ -280,17 +287,16 @@ async def match_like(callback: CallbackQuery):
 
     await db.add_like(sender, target)
 
-    link1 = f"tg://user?id={sender}"
-    link2 = f"tg://user?id={target}"
-
     await bot.send_message(
         sender,
-        f"❤️ Взаимный лайк!\n\nНапиши: {link2}"
+        "❤️ Взаимный лайк!",
+        reply_markup=chat_button(target)
     )
 
     await bot.send_message(
         target,
-        f"❤️ Взаимный лайк!\n\nНапиши: {link1}"
+        "❤️ Взаимный лайк!",
+        reply_markup=chat_button(sender)
     )
 
     await callback.answer()
