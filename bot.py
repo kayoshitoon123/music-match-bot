@@ -45,14 +45,12 @@ async def show_next_profile(user_id):
     target = candidates[0]
 
     text = f"""
-
 {target[1]}, {target[2]}
 {target[3]}
 
 {target[4]}
 
 {target[7]}
-
 """
 
     if target[6]:
@@ -225,6 +223,34 @@ async def like_profile(callback: CallbackQuery):
     await db.add_like(sender, target_id)
     await db.add_action(sender, target_id, "like")
 
+    sender_profile = await db.get_user(sender)
+
+    text = f"""
+{sender_profile[1]}, {sender_profile[2]}
+{sender_profile[3]}
+
+{sender_profile[4]}
+
+{sender_profile[7]}
+"""
+
+    if sender_profile[6]:
+
+        await bot.send_photo(
+            target_id,
+            sender_profile[6],
+            caption="🔥 Твоя анкета понравилась пользователю!\n\n" + text,
+            reply_markup=match_kb(sender)
+        )
+
+    else:
+
+        await bot.send_message(
+            target_id,
+            "🔥 Твоя анкета понравилась пользователю!\n\n" + text,
+            reply_markup=match_kb(sender)
+        )
+
     await callback.answer("❤️ Лайк отправлен")
 
     await show_next_profile(sender)
@@ -241,6 +267,34 @@ async def skip_profile(callback: CallbackQuery):
     await callback.answer("Анкета пропущена")
 
     await show_next_profile(user_id)
+
+
+@dp.callback_query(F.data.startswith("match_like_"))
+async def match_like(callback: CallbackQuery):
+
+    receiver = callback.from_user.id
+    sender = int(callback.data.split("_")[2])
+
+    await db.add_like(receiver, sender)
+
+    if await db.check_match(receiver, sender):
+
+        user1 = await bot.get_chat(receiver)
+        user2 = await bot.get_chat(sender)
+
+        link1 = f"https://t.me/{user1.username}"
+        link2 = f"https://t.me/{user2.username}"
+
+        await bot.send_message(sender, f"🎉 У вас взаимный лайк!\n{link1}")
+        await bot.send_message(receiver, f"🎉 У вас взаимный лайк!\n{link2}")
+
+    await callback.answer("❤️ Лайк отправлен")
+
+
+@dp.callback_query(F.data == "match_skip")
+async def match_skip(callback: CallbackQuery):
+
+    await callback.answer("Анкета отклонена 👎")
 
 
 async def main():
