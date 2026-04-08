@@ -74,8 +74,6 @@ async def show_next_profile(user_id):
         )
 
 
-# старт
-
 @dp.message(CommandStart())
 async def start(message: types.Message, state: FSMContext):
 
@@ -95,8 +93,6 @@ async def start(message: types.Message, state: FSMContext):
         await state.set_state(Form.name)
 
 
-# имя
-
 @dp.message(Form.name)
 async def name(message: types.Message, state: FSMContext):
 
@@ -107,8 +103,6 @@ async def name(message: types.Message, state: FSMContext):
     await state.set_state(Form.age)
 
 
-# возраст
-
 @dp.message(Form.age)
 async def age(message: types.Message, state: FSMContext):
 
@@ -118,8 +112,6 @@ async def age(message: types.Message, state: FSMContext):
 
     await state.set_state(Form.city)
 
-
-# город
 
 @dp.message(Form.city)
 async def city(message: types.Message, state: FSMContext):
@@ -134,8 +126,6 @@ async def city(message: types.Message, state: FSMContext):
     await state.set_state(Form.role)
 
 
-# роль
-
 @dp.message(Form.role)
 async def role(message: types.Message, state: FSMContext):
 
@@ -149,8 +139,6 @@ async def role(message: types.Message, state: FSMContext):
     await state.set_state(Form.looking)
 
 
-# кого ищем
-
 @dp.message(Form.looking)
 async def looking(message: types.Message, state: FSMContext):
 
@@ -163,8 +151,6 @@ async def looking(message: types.Message, state: FSMContext):
 
     await state.set_state(Form.photo)
 
-
-# фото
 
 @dp.message(Form.photo)
 async def photo(message: types.Message, state: FSMContext):
@@ -187,8 +173,6 @@ async def photo(message: types.Message, state: FSMContext):
     await state.set_state(Form.beat)
 
 
-# бит
-
 @dp.message(Form.beat)
 async def beat(message: types.Message, state: FSMContext):
 
@@ -207,8 +191,6 @@ async def beat(message: types.Message, state: FSMContext):
 
     await state.set_state(Form.description)
 
-
-# описание
 
 @dp.message(Form.description)
 async def desc(message: types.Message, state: FSMContext):
@@ -249,8 +231,6 @@ async def desc(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-# изменить анкету
-
 @dp.message(F.text == "✏️ Изменить анкету")
 async def edit(message: types.Message, state: FSMContext):
 
@@ -261,15 +241,11 @@ async def edit(message: types.Message, state: FSMContext):
     await state.set_state(Form.name)
 
 
-# поиск
-
 @dp.message(F.text == "🔎 Начать поиск")
 async def search(message: types.Message):
 
     await show_next_profile(message.from_user.id)
 
-
-# ❤️ лайк анкеты
 
 @dp.callback_query(F.data.startswith("like_"))
 async def like_profile(callback: CallbackQuery):
@@ -278,6 +254,7 @@ async def like_profile(callback: CallbackQuery):
     target_id = int(callback.data.split("_")[1])
 
     await db.add_like(sender, target_id)
+    await db.add_action(sender, target_id, "like")
 
     sender_profile = await db.get_user(sender)
 
@@ -312,19 +289,18 @@ async def like_profile(callback: CallbackQuery):
     await show_next_profile(sender)
 
 
-# 👎 пропуск анкеты
-
 @dp.callback_query(F.data.startswith("skip_"))
 async def skip_profile(callback: CallbackQuery):
 
     user_id = callback.from_user.id
+    target_id = int(callback.data.split("_")[1])
+
+    await db.add_action(user_id, target_id, "skip")
 
     await callback.answer("Анкета пропущена")
 
     await show_next_profile(user_id)
 
-
-# ❤️ взаимный лайк
 
 @dp.callback_query(F.data.startswith("match_like_"))
 async def match_like(callback: CallbackQuery):
@@ -347,8 +323,6 @@ async def match_like(callback: CallbackQuery):
 
     await callback.answer("❤️ Лайк отправлен")
 
-
-# 👎 отклонить лайк
 
 @dp.callback_query(F.data == "match_skip")
 async def match_skip(callback: CallbackQuery):
