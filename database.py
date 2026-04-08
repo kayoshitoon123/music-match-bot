@@ -34,7 +34,9 @@ async def init_db():
         CREATE TABLE IF NOT EXISTS likes(
 
         user_from INTEGER,
-        user_to INTEGER
+        user_to INTEGER,
+
+        UNIQUE(user_from,user_to)
 
         )
 
@@ -172,7 +174,7 @@ async def add_like(a,b):
     async with aiosqlite.connect(DB) as db:
 
         await db.execute(
-        "INSERT INTO likes VALUES(?,?)",
+        "INSERT OR IGNORE INTO likes VALUES(?,?)",
         (a,b)
         )
 
@@ -185,8 +187,7 @@ async def check_match(a,b):
 
         cursor=await db.execute("""
 
-        SELECT * FROM likes
-
+        SELECT 1 FROM likes
         WHERE user_from=? AND user_to=?
 
         """,(b,a))
