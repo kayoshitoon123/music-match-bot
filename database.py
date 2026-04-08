@@ -22,7 +22,6 @@ async def init_db():
         looking TEXT,
 
         photo TEXT,
-        beat TEXT,
 
         description TEXT
 
@@ -62,7 +61,7 @@ async def add_user(data):
     async with aiosqlite.connect(DB) as db:
 
         await db.execute(
-        "INSERT OR REPLACE INTO users VALUES(?,?,?,?,?,?,?,?,?)",
+        "INSERT OR REPLACE INTO users VALUES(?,?,?,?,?,?,?,?)",
         data
         )
 
