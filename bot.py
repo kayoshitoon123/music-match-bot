@@ -33,6 +33,10 @@ async def show_next_profile(user_id):
 
     user = await db.get_user(user_id)
 
+    if not user:
+        await bot.send_message(user_id, "Сначала создай анкету")
+        return
+
     candidates = await db.get_candidates(user)
 
     if not candidates:
@@ -44,13 +48,17 @@ async def show_next_profile(user_id):
 
     target = candidates[0]
 
+    await db.add_view(user_id, target[0])
+
     text = f"""
+
 {target[1]}, {target[2]}
 {target[3]}
 
 {target[4]}
 
 {target[7]}
+
 """
 
     if target[6]:
@@ -73,6 +81,8 @@ async def show_next_profile(user_id):
 
 @dp.message(CommandStart())
 async def start(message: types.Message, state: FSMContext):
+
+    await state.clear()
 
     user = await db.get_user(message.from_user.id)
 
@@ -102,6 +112,11 @@ async def name(message: types.Message, state: FSMContext):
 
 @dp.message(Form.age)
 async def age(message: types.Message, state: FSMContext):
+
+    if not message.text.isdigit():
+
+        await message.answer("Введите возраст числом")
+        return
 
     await state.update_data(age=int(message.text))
 
@@ -156,11 +171,14 @@ async def photo(message: types.Message, state: FSMContext):
 
         await state.update_data(photo=None)
 
+    elif message.photo:
+
+        await state.update_data(photo=message.photo[-1].file_id)
+
     else:
 
-        photo = message.photo[-1].file_id
-
-        await state.update_data(photo=photo)
+        await message.answer("Отправь фото или нажми Пропустить")
+        return
 
     await message.answer(
         "Напиши описание или пропусти",
@@ -173,29 +191,19 @@ async def photo(message: types.Message, state: FSMContext):
 @dp.message(Form.description)
 async def desc(message: types.Message, state: FSMContext):
 
-    if message.text == "Пропустить":
-
-        description = ""
-
-    else:
-
-        description = message.text
+    description = "" if message.text == "Пропустить" else message.text
 
     data = await state.get_data()
 
     await db.add_user((
 
         message.from_user.id,
-
         data["name"],
         data["age"],
         data["city"],
-
         data["role"],
         data["looking"],
-
         data["photo"],
-
         description
 
     ))
@@ -218,38 +226,9 @@ async def search(message: types.Message):
 async def like_profile(callback: CallbackQuery):
 
     sender = callback.from_user.id
-    target_id = int(callback.data.split("_")[1])
+    target = int(callback.data.split("_")[1])
 
-    await db.add_like(sender, target_id)
-    await db.add_action(sender, target_id, "like")
-
-    sender_profile = await db.get_user(sender)
-
-    text = f"""
-{sender_profile[1]}, {sender_profile[2]}
-{sender_profile[3]}
-
-{sender_profile[4]}
-
-{sender_profile[7]}
-"""
-
-    if sender_profile[6]:
-
-        await bot.send_photo(
-            target_id,
-            sender_profile[6],
-            caption="🔥 Твоя анкета понравилась пользователю!\n\n" + text,
-            reply_markup=match_kb(sender)
-        )
-
-    else:
-
-        await bot.send_message(
-            target_id,
-            "🔥 Твоя анкета понравилась пользователю!\n\n" + text,
-            reply_markup=match_kb(sender)
-        )
+    await db.add_like(sender, target)
 
     await callback.answer("❤️ Лайк отправлен")
 
@@ -259,47 +238,16 @@ async def like_profile(callback: CallbackQuery):
 @dp.callback_query(F.data.startswith("skip_"))
 async def skip_profile(callback: CallbackQuery):
 
-    user_id = callback.from_user.id
-    target_id = int(callback.data.split("_")[1])
-
-    await db.add_action(user_id, target_id, "skip")
-
     await callback.answer("Анкета пропущена")
 
-    await show_next_profile(user_id)
-
-
-@dp.callback_query(F.data.startswith("match_like_"))
-async def match_like(callback: CallbackQuery):
-
-    receiver = callback.from_user.id
-    sender = int(callback.data.split("_")[2])
-
-    await db.add_like(receiver, sender)
-
-    if await db.check_match(receiver, sender):
-
-        user1 = await bot.get_chat(receiver)
-        user2 = await bot.get_chat(sender)
-
-        link1 = f"https://t.me/{user1.username}"
-        link2 = f"https://t.me/{user2.username}"
-
-        await bot.send_message(sender, f"🎉 У вас взаимный лайк!\n{link1}")
-        await bot.send_message(receiver, f"🎉 У вас взаимный лайк!\n{link2}")
-
-    await callback.answer("❤️ Лайк отправлен")
-
-
-@dp.callback_query(F.data == "match_skip")
-async def match_skip(callback: CallbackQuery):
-
-    await callback.answer("Анкета отклонена 👎")
+    await show_next_profile(callback.from_user.id)
 
 
 async def main():
 
     await db.init_db()
+
+    await bot.delete_webhook(drop_pending_updates=True)
 
     await dp.start_polling(bot)
 
