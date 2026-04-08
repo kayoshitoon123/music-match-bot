@@ -17,13 +17,13 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
 
-def match_kb(user_id):
+def like_notify_kb(user_id):
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="❤️", callback_data=f"match_like_{user_id}"),
-                InlineKeyboardButton(text="👎", callback_data="match_skip")
+                InlineKeyboardButton(text="❤️ Лайк", callback_data=f"match_like_{user_id}"),
+                InlineKeyboardButton(text="👎 Скип", callback_data="match_skip")
             ]
         ]
     )
@@ -51,14 +51,12 @@ async def show_next_profile(user_id):
     await db.add_view(user_id, target[0])
 
     text = f"""
-
 {target[1]}, {target[2]}
 {target[3]}
 
 {target[4]}
 
 {target[7]}
-
 """
 
     if target[6]:
@@ -96,7 +94,6 @@ async def start(message: types.Message, state: FSMContext):
     else:
 
         await message.answer("Как тебя зовут?")
-
         await state.set_state(Form.name)
 
 
@@ -106,7 +103,6 @@ async def name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
 
     await message.answer("Сколько тебе лет?")
-
     await state.set_state(Form.age)
 
 
@@ -121,7 +117,6 @@ async def age(message: types.Message, state: FSMContext):
     await state.update_data(age=int(message.text))
 
     await message.answer("Из какого ты города?")
-
     await state.set_state(Form.city)
 
 
@@ -130,11 +125,7 @@ async def city(message: types.Message, state: FSMContext):
 
     await state.update_data(city=message.text)
 
-    await message.answer(
-        "Кто ты?",
-        reply_markup=kb.role_kb
-    )
-
+    await message.answer("Кто ты?", reply_markup=kb.role_kb)
     await state.set_state(Form.role)
 
 
@@ -143,11 +134,7 @@ async def role(message: types.Message, state: FSMContext):
 
     await state.update_data(role=message.text)
 
-    await message.answer(
-        "Кого ищешь?",
-        reply_markup=kb.search_role_kb
-    )
-
+    await message.answer("Кого ищешь?", reply_markup=kb.search_role_kb)
     await state.set_state(Form.looking)
 
 
@@ -230,9 +217,89 @@ async def like_profile(callback: CallbackQuery):
 
     await db.add_like(sender, target)
 
+    match = await db.check_match(sender, target)
+
+    if match:
+
+        sender_profile = await db.get_user(sender)
+        target_profile = await db.get_user(target)
+
+        link1 = f"tg://user?id={sender}"
+        link2 = f"tg://user?id={target}"
+
+        await bot.send_message(
+            sender,
+            f"❤️ Взаимный лайк!\n\nНапиши: {link2}"
+        )
+
+        await bot.send_message(
+            target,
+            f"❤️ Взаимный лайк!\n\nНапиши: {link1}"
+        )
+
+    else:
+
+        sender_profile = await db.get_user(sender)
+
+        text = f"""
+{sender_profile[1]}, {sender_profile[2]}
+{sender_profile[3]}
+
+{sender_profile[4]}
+
+{sender_profile[7]}
+"""
+
+        if sender_profile[6]:
+
+            await bot.send_photo(
+                target,
+                sender_profile[6],
+                caption="🔥 Ваша анкета кому-то понравилась\n\n"+text,
+                reply_markup=like_notify_kb(sender)
+            )
+
+        else:
+
+            await bot.send_message(
+                target,
+                "🔥 Ваша анкета кому-то понравилась\n\n"+text,
+                reply_markup=like_notify_kb(sender)
+            )
+
     await callback.answer("❤️ Лайк отправлен")
 
     await show_next_profile(sender)
+
+
+@dp.callback_query(F.data.startswith("match_like_"))
+async def match_like(callback: CallbackQuery):
+
+    sender = callback.from_user.id
+    target = int(callback.data.split("_")[2])
+
+    await db.add_like(sender, target)
+
+    link1 = f"tg://user?id={sender}"
+    link2 = f"tg://user?id={target}"
+
+    await bot.send_message(
+        sender,
+        f"❤️ Взаимный лайк!\n\nНапиши: {link2}"
+    )
+
+    await bot.send_message(
+        target,
+        f"❤️ Взаимный лайк!\n\nНапиши: {link1}"
+    )
+
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "match_skip")
+async def match_skip(callback: CallbackQuery):
+
+    await callback.answer("Анкета пропущена")
 
 
 @dp.callback_query(F.data.startswith("skip_"))
